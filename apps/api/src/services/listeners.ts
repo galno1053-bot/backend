@@ -29,14 +29,16 @@ export const startEvmListener = async () => {
     address: config.escrowEvmAddress as `0x${string}`,
     abi: escrowAbi,
     eventName: "Deposit",
-    onLogs: async (logs) => {
+    onLogs: async (logs: any[]) => {
       for (const entry of logs) {
-        const txHash = entry.transactionHash;
+        const txHash = entry.transactionHash as string | null | undefined;
+        if (!txHash) continue;
         const existing = await prisma.depositTx.findUnique({ where: { txHash } });
         if (existing) continue;
-        const userAddress = (entry.args?.user as string)?.toLowerCase();
+        const args = entry.args as { user?: string; amount?: bigint } | undefined;
+        const userAddress = args?.user?.toLowerCase();
         if (!userAddress) continue;
-        const amountWei = entry.args?.amount as bigint;
+        const amountWei = args?.amount ?? 0n;
         const amount = Number(formatEther(amountWei));
 
         let user = await prisma.user.findFirst({ where: { evmAddress: userAddress } });

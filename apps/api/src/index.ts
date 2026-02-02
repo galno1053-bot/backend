@@ -12,7 +12,8 @@ import { startEvmListener, startSolanaListener } from "./services/listeners.js";
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
-app.use(pinoHttp());
+const httpLogger = (pinoHttp as unknown as (opts?: any) => any)();
+app.use(httpLogger);
 
 const server = http.createServer(app);
 const io = new SocketServer(server, {

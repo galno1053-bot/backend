@@ -35,7 +35,7 @@ export class GameEngine {
   private currentRoundId: string | null = null;
   private serverSeed = "";
   private serverSeedHash = "";
-  private clientSeed = crypto.randomUUID();
+  private clientSeed: string = crypto.randomUUID();
   private nonce = 0;
   private crashPoint = 1;
   private startedAt: number | null = null;
