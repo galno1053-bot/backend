@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
+    "start": "prisma db push && node dist/index.js",
     "lint": "echo 'no lint'",
     "test": "vitest",
     "prisma": "prisma"
