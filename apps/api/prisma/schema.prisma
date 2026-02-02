@@ -44,6 +44,8 @@ model User {
   bets        Bet[]
   chatMessages ChatMessage[]
   ledger      LedgerEntry[]
+  depositTxs  DepositTx[]
+  withdrawTxs WithdrawTx[]
 }
 
 model Round {
