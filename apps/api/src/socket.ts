@@ -15,25 +15,31 @@ export const setupSocket = (io: SocketServer, game: GameEngine) => {
 
   io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
-    if (!token) return next(new Error("Unauthorized"));
+    if (!token) return next();
     const user = await getUserFromToken(token);
-    if (!user) return next(new Error("Unauthorized"));
-    socket.data.user = user;
+    if (user) {
+      socket.data.user = user;
+    }
     next();
   });
 
   io.on("connection", async (socket) => {
-    const user = socket.data.user as { id: string; username: string };
-    onlineUsers.set(socket.id, { userId: user.id, username: user.username });
-
-    io.emit("presence:update", {
-      onlineCount: onlineUsers.size,
-      users: Array.from(onlineUsers.values())
-    });
+    const user = socket.data.user as { id: string; username: string } | undefined;
+    if (user) {
+      onlineUsers.set(socket.id, { userId: user.id, username: user.username });
+      io.emit("presence:update", {
+        onlineCount: onlineUsers.size,
+        users: Array.from(onlineUsers.values())
+      });
+    }
 
     socket.emit("round:state", game.getState());
 
     socket.on("bet:place", async (payload, ack) => {
+      if (!user) {
+        if (ack) ack({ ok: false, error: "Unauthorized" });
+        return;
+      }
       const now = Date.now();
       const last = lastBetAt.get(user.id) ?? 0;
       if (now - last < 800) {
@@ -47,6 +53,10 @@ export const setupSocket = (io: SocketServer, game: GameEngine) => {
     });
 
     socket.on("bet:cashout", async (_payload, ack) => {
+      if (!user) {
+        if (ack) ack({ ok: false, error: "Unauthorized" });
+        return;
+      }
       const now = Date.now();
       const last = lastBetAt.get(user.id) ?? 0;
       if (now - last < 300) {
@@ -59,6 +69,10 @@ export const setupSocket = (io: SocketServer, game: GameEngine) => {
     });
 
     socket.on("chat:send", async (payload, ack) => {
+      if (!user) {
+        if (ack) ack({ ok: false, error: "Unauthorized" });
+        return;
+      }
       const now = Date.now();
       const last = lastChatAt.get(user.id) ?? 0;
       if (now - last < 2000) {
@@ -94,11 +108,13 @@ export const setupSocket = (io: SocketServer, game: GameEngine) => {
     });
 
     socket.on("disconnect", () => {
-      onlineUsers.delete(socket.id);
-      io.emit("presence:update", {
-        onlineCount: onlineUsers.size,
-        users: Array.from(onlineUsers.values())
-      });
+      if (user) {
+        onlineUsers.delete(socket.id);
+        io.emit("presence:update", {
+          onlineCount: onlineUsers.size,
+          users: Array.from(onlineUsers.values())
+        });
+      }
     });
   });
 };
