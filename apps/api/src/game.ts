@@ -39,6 +39,7 @@ export class GameEngine {
   private nonce = 0;
   private crashPoint = 1;
   private startedAt: number | null = null;
+  private waitingUntil: number | null = null;
   private waitingTimeout?: NodeJS.Timeout;
   private tickInterval?: NodeJS.Timeout;
 
@@ -59,7 +60,8 @@ export class GameEngine {
       serverSeedHash: this.serverSeedHash,
       serverSeedRevealed: this.status === "CRASHED" ? this.serverSeed : null,
       clientSeed: this.clientSeed,
-      nonce: this.nonce
+      nonce: this.nonce,
+      waitingEndsAt: this.status === "WAITING" ? this.waitingUntil : null
     };
   }
 
@@ -155,6 +157,7 @@ export class GameEngine {
   private async startWaiting() {
     this.status = "WAITING";
     this.startedAt = null;
+    this.waitingUntil = Date.now() + WAITING_MS;
     this.serverSeed = this.seedFn() + this.seedFn();
     this.serverSeedHash = crypto.createHash("sha256").update(this.serverSeed).digest("hex");
     this.nonce += 1;
@@ -173,6 +176,7 @@ export class GameEngine {
     this.io.emit("round:state", {
       status: this.status,
       waitingMs: WAITING_MS,
+      waitingEndsAt: this.waitingUntil,
       roundId: round.id,
       serverSeedHash: this.serverSeedHash,
       clientSeed: this.clientSeed,
@@ -186,6 +190,7 @@ export class GameEngine {
     if (!this.currentRoundId) return;
     this.status = "RUNNING";
     this.startedAt = Date.now();
+    this.waitingUntil = null;
     await prisma.round.update({
       where: { id: this.currentRoundId },
       data: { status: "RUNNING", startedAt: new Date(this.startedAt) }
@@ -196,7 +201,8 @@ export class GameEngine {
       roundId: this.currentRoundId,
       serverSeedHash: this.serverSeedHash,
       clientSeed: this.clientSeed,
-      nonce: this.nonce
+      nonce: this.nonce,
+      waitingEndsAt: this.waitingUntil
     });
 
     this.tickInterval = setInterval(() => this.tick(), TICK_MS);
