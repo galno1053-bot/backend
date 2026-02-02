@@ -4,7 +4,6 @@ import { prisma } from "./db.js";
 import { buildNonceMessage, clearNonce, getUserFromToken, issueJwt, issueNonce, verifyEvmSignature, verifySolSignature } from "./auth.js";
 import { getBalance } from "./ledger.js";
 import { GameEngine, computeCrashPoint } from "./game.js";
-import { config } from "./config.js";
 import { sendEvmWithdraw, sendSolanaWithdraw } from "./services/withdraw.js";
 
 export const buildRouter = (game: GameEngine) => {
