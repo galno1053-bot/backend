@@ -1,0 +1,19 @@
+{
+  "name": "galno-backend",
+  "private": true,
+  "packageManager": "pnpm@9.12.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "contracts/*",
+    "programs/*"
+  ],
+  "scripts": {
+    "dev": "pnpm -C apps/api dev",
+    "build": "pnpm -C apps/api build",
+    "lint": "pnpm -C apps/api lint",
+    "test": "pnpm -C apps/api test",
+    "db:migrate": "pnpm -C apps/api prisma migrate dev",
+    "db:generate": "pnpm -C apps/api prisma generate"
+  }
+}

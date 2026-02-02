@@ -1,0 +1,120 @@
+// Prisma schema for Galno MVP
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoundStatus {
+  WAITING
+  RUNNING
+  CRASHED
+}
+
+enum BetStatus {
+  ACTIVE
+  CASHED_OUT
+  LOST
+}
+
+enum LedgerType {
+  DEPOSIT
+  WITHDRAW
+  BET
+  PAYOUT
+}
+
+enum ChainType {
+  EVM
+  SOL
+}
+
+model User {
+  id          String   @id @default(cuid())
+  evmAddress  String?  @unique
+  solAddress  String?  @unique
+  username    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  bets        Bet[]
+  chatMessages ChatMessage[]
+  ledger      LedgerEntry[]
+}
+
+model Round {
+  id                 String      @id @default(cuid())
+  status             RoundStatus
+  startedAt          DateTime?
+  endedAt            DateTime?
+  crashPoint         Float?
+  serverSeedHash     String
+  serverSeedRevealed String?
+  clientSeed         String
+  nonce              Int
+  createdAt          DateTime @default(now())
+
+  bets               Bet[]
+}
+
+model Bet {
+  id                     String    @id @default(cuid())
+  userId                 String
+  roundId                String
+  amount                 Decimal   @db.Decimal(18, 9)
+  status                 BetStatus
+  cashedOutAtMultiplier  Float?
+  profit                 Decimal?  @db.Decimal(18, 9)
+  createdAt              DateTime @default(now())
+
+  user                   User     @relation(fields: [userId], references: [id])
+  round                  Round    @relation(fields: [roundId], references: [id])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  text      String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model LedgerEntry {
+  id        String    @id @default(cuid())
+  userId    String
+  type      LedgerType
+  amount    Decimal   @db.Decimal(18, 9)
+  chain     ChainType
+  txHash    String?
+  createdAt DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id])
+}
+
+model DepositTx {
+  id          String   @id @default(cuid())
+  userId      String
+  chain       ChainType
+  txHash      String   @unique
+  amount      Decimal  @db.Decimal(18, 9)
+  confirmations Int
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model WithdrawTx {
+  id          String   @id @default(cuid())
+  userId      String
+  chain       ChainType
+  txHash      String   @unique
+  amount      Decimal  @db.Decimal(18, 9)
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+}
