@@ -22,6 +22,11 @@ const crashFromHash = (hashHex: string) => {
   return Number(crash.toFixed(2));
 };
 
+const seededFloat = (seed: string, index: number) => {
+  const hash = crypto.createHash("sha256").update(`${seed}:${index}`).digest();
+  return hash.readUInt32BE(0) / 0xffffffff;
+};
+
 export const computeCrashPoint = (serverSeed: string, clientSeed: string, nonce: number, roundId: string) => {
   const message = `${clientSeed}:${nonce}:${roundId}`;
   const hash = hmacSha256(serverSeed, message);
@@ -42,6 +47,9 @@ export class GameEngine {
   private waitingUntil: number | null = null;
   private noise = 0;
   private currentMultiplier = 1;
+  private wavePhase = 0;
+  private waveSpeed = 1.4;
+  private waveAmp = 0.12;
   private waitingTimeout?: NodeJS.Timeout;
   private tickInterval?: NodeJS.Timeout;
 
@@ -194,6 +202,9 @@ export class GameEngine {
     this.waitingUntil = null;
     this.noise = 0;
     this.currentMultiplier = 1;
+    this.wavePhase = seededFloat(this.serverSeed, 1) * Math.PI * 2;
+    this.waveSpeed = 0.9 + seededFloat(this.serverSeed, 2) * 1.4;
+    this.waveAmp = 0.12 + seededFloat(this.serverSeed, 3) * 0.18;
     await prisma.round.update({
       where: { id: this.currentRoundId },
       data: { status: "RUNNING", startedAt: new Date(this.startedAt) }
@@ -215,8 +226,10 @@ export class GameEngine {
     if (this.status !== "RUNNING" || !this.startedAt) return;
     const elapsed = (Date.now() - this.startedAt) / 1000;
     const base = Math.exp(GROWTH_K * elapsed);
-    this.noise = Math.max(-0.3, Math.min(0.3, this.noise + (Math.random() - 0.5) * 0.03));
-    const multiplier = Math.max(0.3, base * (1 + this.noise));
+    const wave = Math.sin(this.waveSpeed * elapsed + this.wavePhase) * this.waveAmp;
+    this.noise = this.noise * 0.96 + (Math.random() - 0.5) * 0.04;
+    this.noise = Math.max(-0.25, Math.min(0.25, this.noise));
+    const multiplier = Math.max(0.3, base * (1 + wave + this.noise));
     this.currentMultiplier = multiplier;
 
     this.io.emit("round:tick", {
