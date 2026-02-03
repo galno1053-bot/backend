@@ -7,7 +7,7 @@ import { canCashout, canPlaceBet } from "./betRules.js";
 export type GameStatus = "WAITING" | "RUNNING" | "CRASHED";
 
 const WAITING_MS = 5000;
-const TICK_MS = 50;
+const TICK_MS = 90;
 const GROWTH_K = 0.12;
 
 const hmacSha256 = (key: string, message: string) => {
@@ -215,7 +215,7 @@ export class GameEngine {
     if (this.status !== "RUNNING" || !this.startedAt) return;
     const elapsed = (Date.now() - this.startedAt) / 1000;
     const base = Math.exp(GROWTH_K * elapsed);
-    this.noise = Math.max(-0.35, Math.min(0.35, this.noise + (Math.random() - 0.5) * 0.06));
+    this.noise = Math.max(-0.3, Math.min(0.3, this.noise + (Math.random() - 0.5) * 0.03));
     const multiplier = Math.max(0.3, base * (1 + this.noise));
     this.currentMultiplier = multiplier;
 
