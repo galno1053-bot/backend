@@ -8,7 +8,7 @@ export type GameStatus = "WAITING" | "RUNNING" | "CRASHED";
 
 const WAITING_MS = 5000;
 const TICK_MS = 90;
-const GROWTH_K = 0.12;
+const GROWTH_K = 0.105;
 
 const hmacSha256 = (key: string, message: string) => {
   return crypto.createHmac("sha256", key).update(message).digest("hex");
@@ -46,10 +46,10 @@ export class GameEngine {
   private startedAt: number | null = null;
   private waitingUntil: number | null = null;
   private noise = 0;
+  private trend = 0;
+  private trendSlope = 0;
+  private trendUntil = 0;
   private currentMultiplier = 1;
-  private wavePhase = 0;
-  private waveSpeed = 1.4;
-  private waveAmp = 0.12;
   private waitingTimeout?: NodeJS.Timeout;
   private tickInterval?: NodeJS.Timeout;
 
@@ -163,6 +163,17 @@ export class GameEngine {
     return { ok: true, multiplier: Number(multiplier.toFixed(2)) };
   }
 
+  private rollTrend(now: number) {
+    const duration = 1200 + Math.random() * 2200;
+    this.trendUntil = now + duration;
+    const downBias = Math.random();
+    if (downBias < 0.35) {
+      this.trendSlope = -(0.08 + Math.random() * 0.14);
+    } else {
+      this.trendSlope = 0.04 + Math.random() * 0.16;
+    }
+  }
+
   private async startWaiting() {
     this.status = "WAITING";
     this.startedAt = null;
@@ -201,10 +212,11 @@ export class GameEngine {
     this.startedAt = Date.now();
     this.waitingUntil = null;
     this.noise = 0;
+    this.trend = 0;
+    this.trendSlope = 0;
+    this.trendUntil = 0;
     this.currentMultiplier = 1;
-    this.wavePhase = seededFloat(this.serverSeed, 1) * Math.PI * 2;
-    this.waveSpeed = 0.9 + seededFloat(this.serverSeed, 2) * 1.4;
-    this.waveAmp = 0.12 + seededFloat(this.serverSeed, 3) * 0.18;
+    this.rollTrend(Date.now());
     await prisma.round.update({
       where: { id: this.currentRoundId },
       data: { status: "RUNNING", startedAt: new Date(this.startedAt) }
@@ -226,10 +238,16 @@ export class GameEngine {
     if (this.status !== "RUNNING" || !this.startedAt) return;
     const elapsed = (Date.now() - this.startedAt) / 1000;
     const base = Math.exp(GROWTH_K * elapsed);
-    const wave = Math.sin(this.waveSpeed * elapsed + this.wavePhase) * this.waveAmp;
-    this.noise = this.noise * 0.985 + (Math.random() - 0.5) * 0.015;
-    this.noise = Math.max(-0.18, Math.min(0.18, this.noise));
-    const multiplier = Math.max(0.3, base * (1 + wave + this.noise));
+    const now = Date.now();
+    if (now >= this.trendUntil) {
+      this.rollTrend(now);
+    }
+    const dt = TICK_MS / 1000;
+    this.trend += this.trendSlope * dt;
+    this.trend = Math.max(-0.4, Math.min(0.4, this.trend));
+    this.noise = this.noise * 0.99 + (Math.random() - 0.5) * 0.008;
+    this.noise = Math.max(-0.12, Math.min(0.12, this.noise));
+    const multiplier = Math.max(0.3, base * Math.exp(this.trend + this.noise));
     this.currentMultiplier = multiplier;
 
     this.io.emit("round:tick", {
