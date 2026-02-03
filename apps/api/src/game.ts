@@ -227,8 +227,8 @@ export class GameEngine {
     const elapsed = (Date.now() - this.startedAt) / 1000;
     const base = Math.exp(GROWTH_K * elapsed);
     const wave = Math.sin(this.waveSpeed * elapsed + this.wavePhase) * this.waveAmp;
-    this.noise = this.noise * 0.96 + (Math.random() - 0.5) * 0.04;
-    this.noise = Math.max(-0.25, Math.min(0.25, this.noise));
+    this.noise = this.noise * 0.985 + (Math.random() - 0.5) * 0.015;
+    this.noise = Math.max(-0.18, Math.min(0.18, this.noise));
     const multiplier = Math.max(0.3, base * (1 + wave + this.noise));
     this.currentMultiplier = multiplier;
 
