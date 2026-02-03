@@ -40,6 +40,8 @@ export class GameEngine {
   private crashPoint = 1;
   private startedAt: number | null = null;
   private waitingUntil: number | null = null;
+  private noise = 0;
+  private currentMultiplier = 1;
   private waitingTimeout?: NodeJS.Timeout;
   private tickInterval?: NodeJS.Timeout;
 
@@ -122,8 +124,7 @@ export class GameEngine {
     if (!bet) {
       return { ok: false, error: "No active bet." };
     }
-    const elapsed = (Date.now() - (this.startedAt ?? Date.now())) / 1000;
-    const multiplier = Math.exp(GROWTH_K * elapsed);
+    const multiplier = this.currentMultiplier;
     if (multiplier >= this.crashPoint) {
       return { ok: false, error: "Crash already happened." };
     }
@@ -191,6 +192,8 @@ export class GameEngine {
     this.status = "RUNNING";
     this.startedAt = Date.now();
     this.waitingUntil = null;
+    this.noise = 0;
+    this.currentMultiplier = 1;
     await prisma.round.update({
       where: { id: this.currentRoundId },
       data: { status: "RUNNING", startedAt: new Date(this.startedAt) }
@@ -211,7 +214,10 @@ export class GameEngine {
   private async tick() {
     if (this.status !== "RUNNING" || !this.startedAt) return;
     const elapsed = (Date.now() - this.startedAt) / 1000;
-    const multiplier = Math.exp(GROWTH_K * elapsed);
+    const base = Math.exp(GROWTH_K * elapsed);
+    this.noise = Math.max(-0.35, Math.min(0.35, this.noise + (Math.random() - 0.5) * 0.06));
+    const multiplier = Math.max(0.3, base * (1 + this.noise));
+    this.currentMultiplier = multiplier;
 
     this.io.emit("round:tick", {
       t: elapsed,
@@ -219,6 +225,11 @@ export class GameEngine {
     });
 
     if (multiplier >= this.crashPoint) {
+      this.currentMultiplier = this.crashPoint;
+      this.io.emit("round:tick", {
+        t: elapsed,
+        currentMultiplier: Number(this.currentMultiplier.toFixed(2))
+      });
       await this.crash();
     }
   }
